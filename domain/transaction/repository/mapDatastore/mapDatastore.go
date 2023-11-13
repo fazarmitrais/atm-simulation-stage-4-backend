@@ -1,9 +1,8 @@
 package mapdatastore
 
 import (
-	"context"
-
 	"github.com/fazarmitrais/atm-simulation-stage-3/domain/transaction/entity"
+	"github.com/labstack/echo/v4"
 )
 
 type MapDatastore struct {
@@ -16,12 +15,12 @@ func NewMapDatastore() *MapDatastore {
 	return m
 }
 
-func (m *MapDatastore) Add(ctx context.Context, transaction *entity.Transaction) error {
+func (m *MapDatastore) Add(ctx echo.Context, transaction *entity.Transaction) error {
 	m.Transaction[transaction.AccountNumber] = append(m.Transaction[transaction.AccountNumber], transaction)
 	return nil
 }
 
-func (m *MapDatastore) GetLastTransaction(ctx context.Context, accountNumber string, numberOfTransaction int) ([]*entity.Transaction, error) {
+func (m *MapDatastore) GetLastTransaction(ctx echo.Context, accountNumber string, numberOfTransaction int) ([]*entity.Transaction, error) {
 	if numberOfTransaction < 1 {
 		numberOfTransaction = 10
 	}

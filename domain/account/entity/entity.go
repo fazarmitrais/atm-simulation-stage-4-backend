@@ -1,7 +1,7 @@
 package entity
 
 type Account struct {
-	Name          string  `json:"name"`
+	Name          string  `json:"name" gorm:"primaryKey"`
 	AccountNumber string  `json:"accountNumber"`
 	PIN           string  `json:"pin"`
 	Balance       float64 `json:"balance"`
