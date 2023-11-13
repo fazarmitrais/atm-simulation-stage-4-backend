@@ -1,23 +1,11 @@
 package rest
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-
-	"github.com/fazarmitrais/atm-simulation-stage-3/cookie"
-	"github.com/fazarmitrais/atm-simulation-stage-3/domain/account/entity"
-	"github.com/fazarmitrais/atm-simulation-stage-3/lib/envLib"
-	"github.com/fazarmitrais/atm-simulation-stage-3/lib/responseFormatter"
-	middleware "github.com/fazarmitrais/atm-simulation-stage-3/middleware"
 	"github.com/fazarmitrais/atm-simulation-stage-3/service"
-	"github.com/gorilla/mux"
 )
 
 type Rest struct {
 	service *service.Service
-	cookie  *cookie.Cookie
 }
 
 type ResponseFormatter struct {
@@ -26,26 +14,22 @@ type ResponseFormatter struct {
 }
 
 func New(svc *service.Service) *Rest {
-	c := cookie.New()
-	return &Rest{service: svc, cookie: c}
+	return &Rest{service: svc}
 }
 
-func (re *Rest) Register(m *mux.Router) {
-	m = m.PathPrefix("/api/v1/account").Subrouter()
-	m.HandleFunc("/validate", re.PINValidation).Methods(http.MethodPost)
-	m.HandleFunc("/withdraw", middleware.Chain(re.Withdraw, middleware.Required(re.cookie))).Methods(http.MethodPost)
-	m.HandleFunc("/transfer", middleware.Chain(re.Transfer, middleware.Required(re.cookie))).Methods(http.MethodPost)
-	m.HandleFunc("/balance", middleware.Chain(re.BalanceCheck, middleware.Required(re.cookie))).Methods(http.MethodGet)
-	m.HandleFunc("/exit", re.Exit).Methods(http.MethodGet)
+/*
+func (re *Rest) Register(e *echo.Echo) {
+
+	g := e.Group("/api/v1/account")
+	g.POST("/validate", re.PINValidation)
+	g.POST("/withdraw", re.Withdraw)
+	g.POST("/transfer", re.Transfer)
+	g.GET("/balance", re.BalanceCheck)
+	g.GET("/exit", re.Exit)
 }
 
-func (re *Rest) BalanceCheck(w http.ResponseWriter, r *http.Request) {
-	cok, err := re.cookie.Store.Get(r, envLib.GetEnv("COOKIE_STORE_NAME"))
-	if err != nil {
-		responseFormatter.New(http.StatusBadRequest, "Error getting data from cookies", true)
-		return
-	}
-	acct, resp := re.service.BalanceCheck(r.Context(), cok.Values["acctNbr"].(string))
+func (re *Rest) BalanceCheck(c echo.Context) error {
+	acct, resp := re.service.BalanceCheck(c, cok.Values["acctNbr"].(string))
 	if resp != nil {
 		resp.ReturnAsJson(w)
 		return
@@ -55,7 +39,7 @@ func (re *Rest) BalanceCheck(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func (re *Rest) Exit(w http.ResponseWriter, r *http.Request) {
+func (re *Rest) Exit(c echo.Context) error {
 	cookieStore, err := re.cookie.Store.Get(r, envLib.GetEnv("COOKIE_STORE_NAME"))
 	if err != nil {
 		responseFormatter.New(http.StatusBadRequest,
@@ -71,7 +55,7 @@ func (re *Rest) Exit(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(responseFormatter.New(http.StatusOK, "Logout success", false))
 }
 
-func (re *Rest) PINValidation(w http.ResponseWriter, r *http.Request) {
+func (re *Rest) PINValidation(c echo.Context) error {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		responseFormatter.New(http.StatusBadRequest,
@@ -105,7 +89,7 @@ func (re *Rest) PINValidation(w http.ResponseWriter, r *http.Request) {
 	errl.ReturnAsJson(w)
 }
 
-func (re *Rest) Withdraw(w http.ResponseWriter, r *http.Request) {
+func (re *Rest) Withdraw(c echo.Context) error {
 	cookieStore, err := re.cookie.Store.Get(r, envLib.GetEnv("COOKIE_STORE_NAME"))
 	if err != nil {
 		responseFormatter.New(http.StatusInternalServerError,
@@ -142,7 +126,7 @@ func (re *Rest) Withdraw(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(acc)
 }
 
-func (re *Rest) Transfer(w http.ResponseWriter, r *http.Request) {
+func (re *Rest) Transfer(c echo.Context) error {
 	cookieStore, err := re.cookie.Store.Get(r, envLib.GetEnv("COOKIE_STORE_NAME"))
 	if err != nil {
 		responseFormatter.New(http.StatusInternalServerError,
@@ -176,3 +160,4 @@ func (re *Rest) Transfer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(acc)
 }
+*/

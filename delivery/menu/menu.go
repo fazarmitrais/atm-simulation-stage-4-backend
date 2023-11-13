@@ -1,13 +1,13 @@
 package menu
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/fazarmitrais/atm-simulation-stage-3/domain/account/entity"
 	trxEntity "github.com/fazarmitrais/atm-simulation-stage-3/domain/transaction/entity"
 	"github.com/fazarmitrais/atm-simulation-stage-3/service"
+	"github.com/labstack/echo/v4"
 )
 
 type Menu struct {
@@ -19,15 +19,14 @@ func NewMenu(s *service.Service) *Menu {
 	return &Menu{service: s}
 }
 
-func (m *Menu) Start() {
-	c := context.Background()
+func (m *Menu) Start(c echo.Context) {
 	for {
 		m.LoginScreen(c)
 		m.TransactionScreen(c)
 	}
 }
 
-func (m *Menu) LoginScreen(c context.Context) {
+func (m *Menu) LoginScreen(c echo.Context) {
 	for m.accountNumber == nil {
 		var accountNumber, pin string
 		fmt.Println()
@@ -48,7 +47,7 @@ func (m *Menu) LoginScreen(c context.Context) {
 	}
 }
 
-func (m *Menu) TransactionScreen(c context.Context) {
+func (m *Menu) TransactionScreen(c echo.Context) {
 	for m.accountNumber != nil {
 		fmt.Println()
 		fmt.Println("___Transactions___")
@@ -76,7 +75,7 @@ func (m *Menu) TransactionScreen(c context.Context) {
 	}
 }
 
-func (m *Menu) GetLastTransaction(c context.Context) {
+func (m *Menu) GetLastTransaction(c echo.Context) {
 	fmt.Println()
 	fmt.Println("___Last Transaction___")
 	trxs, err := m.service.GetLastTransaction(c, *m.accountNumber, 10)
@@ -96,7 +95,7 @@ func (m *Menu) GetLastTransaction(c context.Context) {
 	fmt.Scanln()
 }
 
-func (m *Menu) BalanceCheck(c context.Context) {
+func (m *Menu) BalanceCheck(c echo.Context) {
 	acc, resp := m.service.BalanceCheck(c, *m.accountNumber)
 	if resp != nil {
 		fmt.Println(resp.Message)
@@ -107,7 +106,7 @@ func (m *Menu) BalanceCheck(c context.Context) {
 	}
 }
 
-func (m *Menu) WithdrawScreen(c context.Context) {
+func (m *Menu) WithdrawScreen(c echo.Context) {
 	for m.accountNumber != nil {
 		fmt.Println()
 		fmt.Println("___Withdrawal___")
@@ -163,7 +162,7 @@ func (m *Menu) Exit() {
 	m.accountNumber = nil
 }
 
-func (m *Menu) OtherWithdrawScreen(c context.Context) float64 {
+func (m *Menu) OtherWithdrawScreen(c echo.Context) float64 {
 	fmt.Println()
 	fmt.Println("___Other Withdraw___")
 	fmt.Print("Enter amount to withdraw: ")
@@ -172,7 +171,7 @@ func (m *Menu) OtherWithdrawScreen(c context.Context) float64 {
 	return amount
 }
 
-func (m *Menu) TransferScreen(c context.Context) {
+func (m *Menu) TransferScreen(c echo.Context) {
 	fmt.Println("Please enter destination account and")
 	fmt.Println("press enter to continue or")
 	fmt.Print("press cancel (Esc) to go back to Transaction: ")

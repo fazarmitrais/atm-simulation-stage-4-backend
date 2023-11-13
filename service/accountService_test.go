@@ -1,13 +1,13 @@
 package service
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"testing"
 
 	"github.com/fazarmitrais/atm-simulation-stage-3/domain/account/entity"
 	trxEntity "github.com/fazarmitrais/atm-simulation-stage-3/domain/transaction/entity"
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -22,7 +22,7 @@ type TransactionRepositoryMock struct {
 
 const (
 	GetByAccountNumber       = "GetByAccountNumber"
-	Store                    = "Store"
+	BatchInsert              = "BatchInsert"
 	CreateTransactionHistory = "CreateTransactionHistory"
 )
 
@@ -40,17 +40,17 @@ var Acct112244 = entity.Account{
 	Balance:       100,
 }
 
-func (mt *TransactionRepositoryMock) Add(ctx context.Context, tx *trxEntity.Transaction) error {
+func (mt *TransactionRepositoryMock) Add(ctx echo.Context, tx *trxEntity.Transaction) error {
 	mt.Called(ctx, tx)
 	return nil
 }
 
-func (mt *TransactionRepositoryMock) GetLastTransaction(ctx context.Context, accountNumber string, numOfLastTransaction int) ([]*trxEntity.Transaction, error) {
+func (mt *TransactionRepositoryMock) GetLastTransaction(ctx echo.Context, accountNumber string, numOfLastTransaction int) ([]*trxEntity.Transaction, error) {
 	mt.Called(ctx, accountNumber, numOfLastTransaction)
 	return nil, nil
 }
 
-func (m *AccountRepositoryMock) GetByAccountNumber(ctx context.Context, accountNumber string) (*entity.Account, error) {
+func (m *AccountRepositoryMock) GetByAccountNumber(ctx echo.Context, accountNumber string) (*entity.Account, error) {
 	args := m.Called(ctx, accountNumber)
 	if args.Get(0) == nil && args.Get(1) == nil {
 		return nil, nil
@@ -58,7 +58,7 @@ func (m *AccountRepositoryMock) GetByAccountNumber(ctx context.Context, accountN
 	return args.Get(0).(*entity.Account), args.Error(1)
 }
 
-func (m *AccountRepositoryMock) GetAll(ctx context.Context) ([]*entity.Account, error) {
+func (m *AccountRepositoryMock) GetAll(ctx echo.Context) ([]*entity.Account, error) {
 	args := m.Called(ctx)
 	if args.Get(0) == nil && args.Get(1) == nil {
 		return nil, nil
@@ -66,7 +66,7 @@ func (m *AccountRepositoryMock) GetAll(ctx context.Context) ([]*entity.Account, 
 	return args.Get(0).([]*entity.Account), args.Error(1)
 }
 
-func (m *AccountRepositoryMock) Store(ctx context.Context, accounts []*entity.Account) error {
+func (m *AccountRepositoryMock) BatchInsert(ctx echo.Context, accounts []*entity.Account) error {
 	args := m.Called(ctx, accounts)
 	if args.Get(0) == nil {
 		return nil
@@ -76,7 +76,7 @@ func (m *AccountRepositoryMock) Store(ctx context.Context, accounts []*entity.Ac
 
 func TestPinValidationAccountNbrIsRequired(t *testing.T) {
 	svc := NewService(nil, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		PIN: "456",
 	})
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -85,7 +85,7 @@ func TestPinValidationAccountNbrIsRequired(t *testing.T) {
 
 func TestPinValidationPINIsRequired(t *testing.T) {
 	svc := NewService(nil, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		AccountNumber: "123",
 	})
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -95,7 +95,7 @@ func TestPinValidationPINIsRequired(t *testing.T) {
 // - Account Number should have 6 digits length. Display message `Account Number should have 6 digits length` for invalid Account Number.
 func TestPinValidationAccountNumberMustSixDigitsLength(t *testing.T) {
 	svc := NewService(nil, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		AccountNumber: "123",
 		PIN:           "456",
 	})
@@ -107,7 +107,7 @@ func TestPinValidationAccountNumberMustSixDigitsLength(t *testing.T) {
 
 func TestPinValidationPINMustSixDigitsLength(t *testing.T) {
 	svc := NewService(nil, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		AccountNumber: "123456",
 		PIN:           "456",
 	})
@@ -118,7 +118,7 @@ func TestPinValidationPINMustSixDigitsLength(t *testing.T) {
 // - Account Number should only contains numbers [0-9]. Display message `Account Number should only contains numbers` for invalid Account Number.
 func TestPinValidationAccountNumberOnlyContainsNumber(t *testing.T) {
 	svc := NewService(nil, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		AccountNumber: "a123456",
 		PIN:           "123456",
 	})
@@ -129,7 +129,7 @@ func TestPinValidationAccountNumberOnlyContainsNumber(t *testing.T) {
 // - PIN should only contains numbers [0-9]. Display message `PIN should only contains numbers` for invalid PIN.
 func TestPinValidationPINOnlyContainsNumber(t *testing.T) {
 	svc := NewService(nil, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		AccountNumber: "123456",
 		PIN:           "a123456",
 	})
@@ -143,7 +143,7 @@ func TestPinValidationInvalidAccountNumber(t *testing.T) {
 	repo := new(AccountRepositoryMock)
 	repo.On(GetByAccountNumber, mock.Anything, "123456").Return(nil, nil)
 	svc := NewService(repo, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		AccountNumber: "123456",
 		PIN:           "1123456",
 	})
@@ -156,7 +156,7 @@ func TestPinValidationInvalidPIN(t *testing.T) {
 	repo := new(AccountRepositoryMock)
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	svc := NewService(repo, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		AccountNumber: Acct112233.AccountNumber,
 		PIN:           "1123456",
 	})
@@ -168,7 +168,7 @@ func TestPinValidationSuccess(t *testing.T) {
 	repo := new(AccountRepositoryMock)
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	svc := NewService(repo, nil, nil)
-	resp := svc.PINValidation(context.Background(), entity.Account{
+	resp := svc.PINValidation(echo.New().AcquireContext(), entity.Account{
 		AccountNumber: Acct112233.AccountNumber,
 		PIN:           Acct112233.PIN,
 	})
@@ -180,7 +180,7 @@ func TestWithdrawMaxAmount1000(t *testing.T) {
 	repo := new(AccountRepositoryMock)
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	svc := NewService(repo, nil, nil)
-	_, resp := svc.Withdraw(context.Background(), Acct112233.AccountNumber, 1001)
+	_, resp := svc.Withdraw(echo.New().AcquireContext(), Acct112233.AccountNumber, 1001)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "Maximum amount to withdraw is $1000", resp.Message)
 }
@@ -190,7 +190,7 @@ func TestWithdrawAmountNotMultipleOf10(t *testing.T) {
 	repo := new(AccountRepositoryMock)
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	svc := NewService(repo, nil, nil)
-	_, resp := svc.Withdraw(context.Background(), Acct112233.AccountNumber, 901)
+	_, resp := svc.Withdraw(echo.New().AcquireContext(), Acct112233.AccountNumber, 901)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "Invalid ammount", resp.Message)
 }
@@ -201,7 +201,7 @@ func TestWithdrawInsufficientBalance(t *testing.T) {
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	svc := NewService(repo, nil, nil)
 	var withdrawAmt float64 = 200
-	_, resp := svc.Withdraw(context.Background(), Acct112233.AccountNumber, withdrawAmt)
+	_, resp := svc.Withdraw(echo.New().AcquireContext(), Acct112233.AccountNumber, withdrawAmt)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, fmt.Sprintf("Insufficient balance $%0.f", withdrawAmt), resp.Message)
 }
@@ -209,7 +209,7 @@ func TestWithdrawInsufficientBalance(t *testing.T) {
 // - Display message `Invalid account` if account is not numbers
 func TestTransferAccountMustBeNumbers(t *testing.T) {
 	svc := NewService(nil, nil, nil)
-	_, resp := svc.Transfer(context.Background(), entity.Transfer{
+	_, resp := svc.Transfer(echo.New().AcquireContext(), entity.Transfer{
 		FromAccountNumber: "a432214213",
 		ToAccountNumber:   "a432214214",
 	})
@@ -223,7 +223,7 @@ func TestTransferFromAccountNumberMustBeCorrect(t *testing.T) {
 	repo.On(GetByAccountNumber, mock.Anything, "432214213").Return(nil, nil)
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	svc := NewService(repo, nil, nil)
-	_, resp := svc.Transfer(context.Background(), entity.Transfer{
+	_, resp := svc.Transfer(echo.New().AcquireContext(), entity.Transfer{
 		FromAccountNumber: "432214213",
 		ToAccountNumber:   Acct112233.AccountNumber,
 	})
@@ -237,7 +237,7 @@ func TestTransferToAccountNumberMustBeCorrect(t *testing.T) {
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	repo.On(GetByAccountNumber, mock.Anything, "432214214").Return(nil, nil)
 	svc := NewService(repo, nil, nil)
-	_, resp := svc.Transfer(context.Background(), entity.Transfer{
+	_, resp := svc.Transfer(echo.New().AcquireContext(), entity.Transfer{
 		FromAccountNumber: "112233",
 		ToAccountNumber:   "432214214",
 		Amount:            10,
@@ -252,7 +252,7 @@ func TestTransferMaxTransferAmountIs1000(t *testing.T) {
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	repo.On(GetByAccountNumber, mock.Anything, Acct112244.AccountNumber).Return(&Acct112244, nil)
 	svc := NewService(repo, nil, nil)
-	_, resp := svc.Transfer(context.Background(), entity.Transfer{
+	_, resp := svc.Transfer(echo.New().AcquireContext(), entity.Transfer{
 		FromAccountNumber: Acct112233.AccountNumber,
 		ToAccountNumber:   Acct112244.AccountNumber,
 		Amount:            1001,
@@ -267,7 +267,7 @@ func TestTransferMinTransferAmountIs1(t *testing.T) {
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	repo.On(GetByAccountNumber, mock.Anything, Acct112244.AccountNumber).Return(&Acct112244, nil)
 	svc := NewService(repo, nil, nil)
-	_, resp := svc.Transfer(context.Background(), entity.Transfer{
+	_, resp := svc.Transfer(echo.New().AcquireContext(), entity.Transfer{
 		FromAccountNumber: Acct112233.AccountNumber,
 		ToAccountNumber:   Acct112244.AccountNumber,
 		Amount:            0.5,
@@ -283,7 +283,7 @@ func TestTransferInsufficientBalance(t *testing.T) {
 	repo.On(GetByAccountNumber, mock.Anything, Acct112244.AccountNumber).Return(&Acct112244, nil)
 	svc := NewService(repo, nil, nil)
 	var trfAmount float64 = 200
-	_, resp := svc.Transfer(context.Background(), entity.Transfer{
+	_, resp := svc.Transfer(echo.New().AcquireContext(), entity.Transfer{
 		FromAccountNumber: Acct112233.AccountNumber,
 		ToAccountNumber:   Acct112244.AccountNumber,
 		Amount:            trfAmount,
@@ -298,7 +298,7 @@ func TestTransferReferenceNumberMustBeNumber(t *testing.T) {
 	repo.On(GetByAccountNumber, mock.Anything, Acct112233.AccountNumber).Return(&Acct112233, nil)
 	repo.On(GetByAccountNumber, mock.Anything, Acct112244.AccountNumber).Return(&Acct112244, nil)
 	svc := NewService(repo, nil, nil)
-	_, resp := svc.Transfer(context.Background(), entity.Transfer{
+	_, resp := svc.Transfer(echo.New().AcquireContext(), entity.Transfer{
 		FromAccountNumber: Acct112233.AccountNumber,
 		ToAccountNumber:   Acct112244.AccountNumber,
 		Amount:            20,
@@ -316,7 +316,7 @@ func TestTransferSuccess(t *testing.T) {
 	accRepo.On(GetByAccountNumber, mock.Anything, Acct112244.AccountNumber).Return(&Acct112244, nil)
 	trxRepo.On("Add", mock.Anything, mock.Anything).Return(nil, nil)
 	svc := NewService(accRepo, nil, trxRepo)
-	ctx := context.Background()
+	ctx := echo.New().AcquireContext()
 	_, resp := svc.Transfer(ctx, entity.Transfer{
 		FromAccountNumber: Acct112233.AccountNumber,
 		ToAccountNumber:   Acct112244.AccountNumber,

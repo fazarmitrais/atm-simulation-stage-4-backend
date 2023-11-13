@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,9 +10,10 @@ import (
 	"github.com/fazarmitrais/atm-simulation-stage-3/domain/account/entity"
 	trxEntity "github.com/fazarmitrais/atm-simulation-stage-3/domain/transaction/entity"
 	"github.com/fazarmitrais/atm-simulation-stage-3/lib/responseFormatter"
+	"github.com/labstack/echo/v4"
 )
 
-func (s *Service) PINValidation(c context.Context, account entity.Account) *responseFormatter.ResponseFormatter {
+func (s *Service) PINValidation(c echo.Context, account entity.Account) *responseFormatter.ResponseFormatter {
 	if strings.Trim(account.AccountNumber, " ") == "" {
 		return responseFormatter.New(http.StatusBadRequest, "Account Number is required", true)
 	} else if strings.Trim(account.PIN, " ") == "" {
@@ -37,7 +37,7 @@ func (s *Service) PINValidation(c context.Context, account entity.Account) *resp
 	return nil
 }
 
-func (s *Service) Withdraw(ctx context.Context, accountNumber string, withdrawAmount float64) (*entity.AccountResponse, *responseFormatter.ResponseFormatter) {
+func (s *Service) Withdraw(ctx echo.Context, accountNumber string, withdrawAmount float64) (*entity.AccountResponse, *responseFormatter.ResponseFormatter) {
 	accFromDb, err := s.getAndValidateByAccountNumber(ctx, accountNumber)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func (s *Service) Withdraw(ctx context.Context, accountNumber string, withdrawAm
 		return nil, responseFormatter.New(http.StatusBadRequest, fmt.Sprintf("Insufficient balance $%0.f", withdrawAmount), true)
 	}
 	accFromDb.Balance -= withdrawAmount
-	errl := s.CreateTransactionHistory(trxEntity.Transaction{
+	errl := s.CreateTransactionHistory(ctx, trxEntity.Transaction{
 		AccountNumber: accountNumber,
 		Amount:        withdrawAmount,
 		Type:          trxEntity.TYPE_WITHDRAWAL,
@@ -65,7 +65,7 @@ func (s *Service) Withdraw(ctx context.Context, accountNumber string, withdrawAm
 	return accFromDb.ToAccountResponse(), nil
 }
 
-func (s *Service) getAndValidateByAccountNumber(c context.Context, acctNbr string) (*entity.Account, *responseFormatter.ResponseFormatter) {
+func (s *Service) getAndValidateByAccountNumber(c echo.Context, acctNbr string) (*entity.Account, *responseFormatter.ResponseFormatter) {
 	if strings.Trim(acctNbr, " ") == "" {
 		return nil, responseFormatter.New(http.StatusBadRequest, "Account Number is required", true)
 	} else if len(acctNbr) < 6 {
@@ -83,7 +83,7 @@ func (s *Service) getAndValidateByAccountNumber(c context.Context, acctNbr strin
 	return accFromDb, nil
 }
 
-func (s *Service) Transfer(ctx context.Context, transfer entity.Transfer) (*entity.AccountResponse, *responseFormatter.ResponseFormatter) {
+func (s *Service) Transfer(ctx echo.Context, transfer entity.Transfer) (*entity.AccountResponse, *responseFormatter.ResponseFormatter) {
 	if transfer.FromAccountNumber == "" || transfer.ToAccountNumber == "" {
 		return nil, responseFormatter.New(http.StatusBadRequest, "Account Number is required", true)
 	} else if transfer.FromAccountNumber == transfer.ToAccountNumber {
@@ -118,7 +118,7 @@ func (s *Service) Transfer(ctx context.Context, transfer entity.Transfer) (*enti
 	}
 	fromAccount.Balance -= transfer.Amount
 	toAccount.Balance += transfer.Amount
-	errl := s.CreateTransactionHistory(trxEntity.Transaction{
+	errl := s.CreateTransactionHistory(ctx, trxEntity.Transaction{
 		AccountNumber:           fromAccount.AccountNumber,
 		TransferToAccountNumber: toAccount.AccountNumber,
 		Amount:                  transfer.Amount,
@@ -130,7 +130,7 @@ func (s *Service) Transfer(ctx context.Context, transfer entity.Transfer) (*enti
 	return fromAccount.ToAccountResponse(), nil
 }
 
-func (s *Service) BalanceCheck(ctx context.Context, acctNbr string) (*entity.AccountResponse, *responseFormatter.ResponseFormatter) {
+func (s *Service) BalanceCheck(ctx echo.Context, acctNbr string) (*entity.AccountResponse, *responseFormatter.ResponseFormatter) {
 	accFromDb, err := s.getAndValidateByAccountNumber(ctx, acctNbr)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (s *Service) BalanceCheck(ctx context.Context, acctNbr string) (*entity.Acc
 	return accFromDb.ToAccountResponse(), nil
 }
 
-func (s *Service) Import(ctx context.Context) error {
+func (s *Service) Import(c echo.Context) error {
 	accounts, err := s.AccountCsvRepository.Import()
 	if err != nil {
 		return err
@@ -154,14 +154,14 @@ func (s *Service) Import(ctx context.Context) error {
 			return errors.New("duplicate account number")
 		}
 	}
-	err = s.AccountRepository.Store(ctx, accounts)
+	err = s.AccountRepository.BatchInsert(c, accounts)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *Service) GetAll(ctx context.Context) ([]*entity.Account, error) {
+func (s *Service) GetAll(ctx echo.Context) ([]*entity.Account, error) {
 	accounts, err := s.AccountRepository.GetAll(ctx)
 	if err != nil {
 		return nil, err
