@@ -20,7 +20,7 @@ func NewService(accountRepository repository.AccountRepository, accountCsvReposi
 
 type ServiceInterface interface {
 	Insert(ctx echo.Context, account entity.Account) error
-	PINValidation(c echo.Context, account entity.Account) *echo.HTTPError
+	PINValidation(c echo.Context, account entity.Account) (*string, *echo.HTTPError)
 	Transfer(ctx echo.Context, transfer trxEntity.Transaction) (*entity.AccountResponse, *echo.HTTPError)
 	BalanceCheck(ctx echo.Context, acctNbr string) (*entity.Account, *echo.HTTPError)
 	Import(path string) error

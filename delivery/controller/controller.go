@@ -29,7 +29,6 @@ func New(svc *service.Service) *Controller {
 
 func (re *Controller) Register(e *echo.Echo) {
 	auth := e.Group("/api/v1/auth")
-	auth.GET("/login", re.PINValidation)
 	auth.POST("/login", re.PINValidation)
 	auth.GET("/logout", re.Logout)
 	account := e.Group("/api/v1/account", cookies.Authorize)
@@ -197,20 +196,18 @@ func (re *Controller) Import(c echo.Context) error {
 }
 
 func (re *Controller) PINValidation(c echo.Context) error {
-	var statusCode int = http.StatusOK
-	if c.Request().Method == http.MethodPost {
-		var acc entity.Account
-		c.Bind(&acc)
-		err := re.service.PINValidation(c, acc)
-		if err != nil {
-			statusCode = err.Code
-			response["message"] = err.Message
-		}
-		cookies.SetCookie(c, acc.AccountNumber)
-		co, _ := c.Cookie("AccountNumber")
-		log.Println(co)
+	var acc entity.Account
+	errl := c.Bind(&acc)
+	if errl != nil {
+		log.Println(errl.Error())
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": errl.Error()})
 	}
-	return c.Render(statusCode, "login.html", response)
+	token, err := re.service.PINValidation(c, acc)
+	if err != nil {
+		log.Println(err.Error())
+		return c.JSON(err.Code, err)
+	}
+	return c.JSON(http.StatusOK, echo.Map{"token": token})
 }
 
 /*

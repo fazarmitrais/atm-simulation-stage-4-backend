@@ -35,7 +35,7 @@ func (m *Menu) LoginScreen(c echo.Context) {
 		fmt.Scanln(&accountNumber)
 		fmt.Print("Enter PIN: ")
 		fmt.Scanln(&pin)
-		resp := m.service.PINValidation(c, entity.Account{
+		_, resp := m.service.PINValidation(c, entity.Account{
 			AccountNumber: accountNumber,
 			PIN:           pin,
 		})

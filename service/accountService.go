@@ -3,37 +3,44 @@ package service
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/fazarmitrais/atm-simulation-stage-3/domain/account/entity"
 	trxEntity "github.com/fazarmitrais/atm-simulation-stage-3/domain/transaction/entity"
+	jwtlib "github.com/fazarmitrais/atm-simulation-stage-3/lib/jwtLib"
 	"github.com/labstack/echo/v4"
 )
 
-func (s *Service) PINValidation(c echo.Context, account entity.Account) *echo.HTTPError {
+func (s *Service) PINValidation(c echo.Context, account entity.Account) (*string, *echo.HTTPError) {
 	if strings.Trim(account.AccountNumber, " ") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "Account Number is required")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "Account Number is required")
 	} else if strings.Trim(account.PIN, " ") == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "PIN is required")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "PIN is required")
 	} else if len(account.AccountNumber) < 6 {
-		return echo.NewHTTPError(http.StatusBadRequest, "Account Number should have 6 digits length")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "Account Number should have 6 digits length")
 	} else if len(account.PIN) < 6 {
-		return echo.NewHTTPError(http.StatusBadRequest, "PIN should have 6 digits length")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "PIN should have 6 digits length")
 	} else if _, err := strconv.Atoi(account.AccountNumber); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Account Number should only contains numbers")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "Account Number should only contains numbers")
 	} else if _, err := strconv.Atoi(account.PIN); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "PIN should only contains numbers")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "PIN should only contains numbers")
 	}
 	accFromDb, err := s.AccountRepository.GetByAccountNumber(c, account.AccountNumber)
 	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to get account")
+		log.Println(err.Message)
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, "Failed to get account")
 	}
 	if accFromDb == nil || accFromDb.PIN != account.PIN {
-		return echo.NewHTTPError(http.StatusBadRequest, "Invalid Account Number/PIN")
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "Invalid Account Number/PIN")
 	}
-	return nil
+	token, err := jwtlib.GenerateToken(c, accFromDb.AccountNumber)
+	if err != nil {
+		return nil, err
+	}
+	return &token, nil
 }
 
 func (s *Service) Withdraw(ctx echo.Context, accountNumber string, withdrawAmount float64) (*entity.AccountResponse, *echo.HTTPError) {
