@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -163,40 +162,44 @@ func (s *Service) BalanceCheck(ctx echo.Context, acctNbr string) (*entity.Accoun
 	return accFromDb.ToAccountResponse(), nil
 }
 
-func (s *Service) Import(c echo.Context, path string) error {
+func (s *Service) Import(c echo.Context, path string) *echo.HTTPError {
 	accounts, err := s.AccountCsvRepository.Import(path)
 	if err != nil {
 		return err
 	}
 	if len(accounts) == 0 {
-		return errors.New("no data imported")
+		return echo.NewHTTPError(http.StatusBadRequest, "no data imported")
 	}
 	accMap := make(map[string]*entity.Account)
 	for _, ac := range accounts {
 		if accMap[ac.AccountNumber] == nil {
 			accMap[ac.AccountNumber] = ac
 		} else {
-			return errors.New("duplicate account number")
+			return echo.NewHTTPError(http.StatusBadRequest, "duplicate account number")
 		}
 	}
 	err = s.AccountRepository.BatchInsert(c, accounts)
 	return err
 }
 
-func (s *Service) Insert(ctx echo.Context, account entity.Account) error {
+func (s *Service) Insert(ctx echo.Context, account entity.Account) *echo.HTTPError {
 	if strings.TrimSpace(account.Name) == "" {
-		return errors.New("name is required")
+		return echo.NewHTTPError(http.StatusBadRequest, "name is required")
 	}
 	if strings.TrimSpace(account.AccountNumber) == "" {
-		return errors.New("Account Number is required")
+		return echo.NewHTTPError(http.StatusBadRequest, "Account Number is required")
+	} else if strings.TrimSpace(account.PIN) == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "PIN is required")
 	} else if len(account.AccountNumber) < 6 {
-		return errors.New("Account Number should have 6 digits length")
+		return echo.NewHTTPError(http.StatusBadRequest, "Account Number should have 6 digits length")
+	} else if len(account.PIN) < 6 {
+		return echo.NewHTTPError(http.StatusBadRequest, "PIN should have 6 digits length")
 	} else if _, err := strconv.Atoi(account.AccountNumber); err != nil {
-		return errors.New("Account Number should only contains numbers")
+		return echo.NewHTTPError(http.StatusBadRequest, "Account Number should only contains numbers")
 	}
 	accFromDb, _ := s.AccountRepository.GetByAccountNumber(ctx, account.AccountNumber)
 	if accFromDb != nil {
-		return errors.New("Account number is already exist")
+		return echo.NewHTTPError(http.StatusBadRequest, "Account number is already exist")
 	}
 	return s.AccountRepository.Insert(ctx, account)
 }

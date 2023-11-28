@@ -10,6 +10,7 @@ import (
 	"github.com/fazarmitrais/atm-simulation-stage-3/cookies"
 	"github.com/fazarmitrais/atm-simulation-stage-3/domain/account/entity"
 	trxEntity "github.com/fazarmitrais/atm-simulation-stage-3/domain/transaction/entity"
+	jwtlib "github.com/fazarmitrais/atm-simulation-stage-3/lib/jwtLib"
 	"github.com/fazarmitrais/atm-simulation-stage-3/service"
 	"github.com/labstack/echo/v4"
 )
@@ -29,24 +30,27 @@ func New(svc *service.Service) *Controller {
 
 func (re *Controller) Register(e *echo.Echo) {
 	auth := e.Group("/api/v1/auth")
+	auth.GET("/token-validation", re.TokenValidation, jwtlib.Required())
 	auth.POST("/login", re.PINValidation)
-	auth.GET("/logout", re.Logout)
-	account := e.Group("/api/v1/account", cookies.Authorize)
+	account := e.Group("/api/v1/account", jwtlib.Required())
 	account.GET("", re.Accounts)
 	account.POST("/import", re.Import)
-	account.GET("/create", re.Create)
 	account.POST("/create", re.Create)
-	withdraw := e.Group("/api/v1/withdraw", cookies.Authorize)
+	withdraw := e.Group("/api/v1/withdraw", jwtlib.Required())
 	withdraw.GET("", re.Withdraw)
 	withdraw.POST("", re.Withdraw)
 	withdraw.GET("/summary", re.WithdrawSummary)
-	transfer := e.Group("/api/v1/transfer", cookies.Authorize)
+	transfer := e.Group("/api/v1/transfer", jwtlib.Required())
 	transfer.GET("", re.Transfer)
 	transfer.POST("", re.Transfer)
 	transfer.GET("/summary", re.TransferSummary)
 }
 
 var response = make(map[string]interface{})
+
+func (re *Controller) TokenValidation(c echo.Context) error {
+	return c.String(http.StatusOK, "OK")
+}
 
 func (re *Controller) Transfer(c echo.Context) error {
 	var statusCode = http.StatusOK
@@ -127,31 +131,17 @@ func (re *Controller) WithdrawSummary(c echo.Context) error {
 	return c.Render(statusCode, "withdrawSummary.html", response)
 }
 
-func (re *Controller) Logout(c echo.Context) error {
-	err := cookies.DeleteCookie(c)
-	if err != nil {
-		response["message"] = err.Message
-		return c.Render(err.Code, "index.html", response)
-	}
-	response["message"] = "Successfully logged out"
-	return c.Render(http.StatusOK, "login.html", response)
-}
-
 func (re *Controller) Create(c echo.Context) error {
-	var err error
-	if c.Request().Method == http.MethodPost {
-		var account entity.Account
-		err = c.Bind(&account)
-		if err == nil {
-			err = re.service.Insert(c, account)
-		}
-		if err != nil {
-			response["message"] = err.Error()
-		} else {
-			response["message"] = "Success"
-		}
+	var account entity.Account
+	err := c.Bind(&account)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
 	}
-	return c.Render(http.StatusOK, "accountForm.html", response)
+	errl := re.service.Insert(c, account)
+	if errl != nil {
+		return c.JSON(errl.Code, echo.Map{"error": errl.Message})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"message": "success"})
 }
 
 func (re *Controller) Accounts(c echo.Context) error {
@@ -159,40 +149,41 @@ func (re *Controller) Accounts(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.Render(http.StatusOK, "index.html", acc)
+	return c.JSON(http.StatusOK, acc)
 }
 
 func (re *Controller) Import(c echo.Context) error {
 	form, err := c.MultipartForm()
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "Error parsing form")
+		log.Println(err)
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Error parsing form"})
 	}
 	files := form.File["fileInput"]
 	if len(files) == 0 {
-		return echo.NewHTTPError(http.StatusBadRequest, "Error retrieving file information")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Error retrieving file information"})
 	}
 	file := files[0]
 	src, err := file.Open()
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "Error opening file")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Error opening file"})
 	}
 	defer src.Close()
 
 	dst, err := os.Create("uploads/" + file.Filename)
 	if err != nil {
-		return c.String(http.StatusInternalServerError, "Error creating file")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Error creating file"})
 	}
 	defer dst.Close()
 
 	if _, err = io.Copy(dst, src); err != nil {
-		return c.String(http.StatusInternalServerError, "Error copying file")
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "Error copying file"})
 	}
 
-	err = re.service.Import(c, "uploads/"+file.Filename)
-	if err != nil {
-		return err
+	errl := re.service.Import(c, "uploads/"+file.Filename)
+	if errl != nil {
+		return c.JSON(errl.Code, echo.Map{"error": errl.Message})
 	}
-	return re.Accounts(c)
+	return c.JSON(http.StatusOK, echo.Map{"message": "Success"})
 }
 
 func (re *Controller) PINValidation(c echo.Context) error {
