@@ -35,7 +35,7 @@ func (m *Menu) LoginScreen(c echo.Context) {
 		fmt.Scanln(&accountNumber)
 		fmt.Print("Enter PIN: ")
 		fmt.Scanln(&pin)
-		resp := m.service.PINValidation(c, entity.Account{
+		_, resp := m.service.PINValidation(c, entity.Account{
 			AccountNumber: accountNumber,
 			PIN:           pin,
 		})
@@ -78,7 +78,7 @@ func (m *Menu) TransactionScreen(c echo.Context) {
 func (m *Menu) GetLastTransaction(c echo.Context) {
 	fmt.Println()
 	fmt.Println("___Last Transaction___")
-	trxs, err := m.service.GetLastTransaction(c, *m.accountNumber, 10)
+	trxs, err := m.service.GetLastTransaction(c, *m.accountNumber, nil, 10)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -201,11 +201,11 @@ func (m *Menu) TransferScreen(c echo.Context) {
 	if input2 == 2 {
 		return
 	} else if input2 == 1 {
-		acc, resp := m.service.Transfer(c, entity.Transfer{
-			FromAccountNumber: *m.accountNumber,
-			ToAccountNumber:   destAcctNbr,
-			ReferenceNumber:   refNumber,
-			Amount:            amount,
+		acc, resp := m.service.Transfer(c, trxEntity.Transaction{
+			AccountNumber:           *m.accountNumber,
+			TransferToAccountNumber: destAcctNbr,
+			ReferenceNumber:         refNumber,
+			Amount:                  amount,
 		})
 		if resp != nil {
 			fmt.Println(resp.Message)
